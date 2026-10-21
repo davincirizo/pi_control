@@ -1,0 +1,15 @@
+.venv/
+.deps/
+__pycache__/
+*.pyc
+.env
+config.json
+data/
+*.sqlite*
+*.db
+*.log
+*.pem
+id_ed25519*
+id_rsa*
+
+*.tar.gz

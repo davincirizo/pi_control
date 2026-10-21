@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>PiControl · Centro de servidores</title>
+  <link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script>
+</head>
+<body>
+  <aside><a class="brand" href="/">▦ <span>PiControl</span></a><p class="eyebrow">TU INFRAESTRUCTURA</p>
+    <nav><a href="#overview">◉ &nbsp; Vista general</a><a href="#schedules">◷ &nbsp; Horarios</a><a href="#history">≡ &nbsp; Actividad</a></nav>
+    <div class="controller"><span class="dot"></span> Controlador previsto<strong>Raspberry Pi 3B+</strong><small>Debian 13 · 1 GB RAM</small></div>
+  </aside>
+  <main id="overview">
+    <header><div><p class="eyebrow">CENTRO DE CONTROL</p><h1>Tus servidores, a tu ritmo.</h1><p class="muted">Controla tus equipos y organiza sus horarios desde un solo lugar.</p></div><div class="clock"><strong id="clock">—</strong><span>Chicago · America/Chicago</span></div></header>
+    <div class="notice"><span class="badge">SIMULACIÓN</span><p>Estás probando el panel. Los botones y horarios solo cambian datos de prueba; no se contacta a tus servidores.</p></div>
+    <div id="error" role="alert" hidden></div>
+    <section class="metrics"><article><span>Servidores registrados</span><strong id="total">2</strong><small>Ubuntu · misma red local</small></article><article><span>Encendidos simulados</span><strong id="online">—</strong><small>No representa el estado real</small></article><article><span>Horarios activos</span><strong id="rules">—</strong><small>Se ejecutan mientras el panel está iniciado</small></article></section>
+    <section><div class="section-title"><h2>Servidores</h2><span class="muted">Control manual</span></div><div id="servers" class="server-grid"></div></section>
+    <section id="schedules"><div class="section-title"><div><h2>Programación semanal</h2><p class="muted">Todos los horarios se interpretan en Chicago.</p></div><button id="new-rule" class="primary">+ Crear horario</button></div><div id="schedule-list" class="panel"></div><p class="footnote">Las acciones atrasadas se omiten. En el cambio de hora de otoño, cada horario se ejecuta una sola vez.</p></section>
+    <section id="history"><div class="section-title"><h2>Actividad reciente</h2><span class="muted">Últimos 100 eventos</span></div><div id="events" class="panel"></div></section>
+    <footer>PiControl / Primera versión <span>Modo local · Sin conexión a equipos reales</span></footer>
+  </main>
+  <dialog id="schedule-dialog"><form id="schedule-form"><div class="section-title"><h2>Crear horario</h2><button type="button" class="close" data-close="schedule-dialog" aria-label="Cerrar">×</button></div><p class="muted">Programación simulada · hora de Chicago</p>
+    <label>Servidor<select name="server" id="server-select" required></select></label>
+    <div class="form-grid"><label>Acción<select name="action"><option value="on">Encender</option><option value="off">Apagar</option><option value="restart">Reiniciar</option></select></label><label>Hora<input name="time" type="time" required></label></div>
+    <fieldset><legend>Días de la semana</legend><div class="days" id="day-options"></div></fieldset><p id="form-error" role="alert"></p><button type="submit" class="primary full">Guardar horario</button>
+  </form></dialog>
+  <dialog id="confirm-dialog"><h2 id="confirm-title">Confirmar acción</h2><p id="confirm-text"></p><div class="dialog-actions"><button data-close="confirm-dialog">Cancelar</button><button id="confirm-yes" class="primary">Confirmar</button></div></dialog>
+  <div id="toast" role="status" hidden></div>
+</body></html>
