@@ -1,4 +1,4 @@
-"""PiControl preview: deliberately contains no SSH or Wake-on-LAN executor."""
+"""PiControl: simulation by default, explicit real mode over an SSH tunnel."""
 import argparse
 import json
 import secrets
@@ -9,6 +9,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from flask import Flask, abort, jsonify, render_template, request, session
+from control import Controller
 
 ROOT = Path(__file__).resolve().parent
 ACTIONS = {"on": "Encender", "off": "Apagar", "restart": "Reiniciar"}
@@ -16,15 +17,20 @@ ACTIONS = {"on": "Encender", "off": "Apagar", "restart": "Reiniciar"}
 
 def create_app(config_path=None, db_path=None):
     config = json.loads(Path(config_path or ROOT / "config.example.json").read_text(encoding="utf-8-sig"))
-    if config.get("mode") != "simulation":
-        raise ValueError("Esta versión solo admite mode=simulation. No ejecuta acciones reales.")
+    mode = config.get("mode")
+    if mode not in {"simulation", "real"}:
+        raise ValueError("Modo desconocido")
+    if mode == "real" and not config.get("ssh"):
+        raise ValueError("El modo real requiere configuración SSH explícita")
+    controller = Controller(config) if mode == "real" else None
     zone = ZoneInfo(config["timezone"])
-    database = Path(db_path or ROOT / "data" / "picontrol.sqlite3")
+    database = Path(db_path or ROOT / "data" / ("real.sqlite3" if controller else "picontrol.sqlite3"))
     database.parent.mkdir(parents=True, exist_ok=True)
     app = Flask(__name__)
     app.secret_key = secrets.token_hex(32)
     app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Strict", MAX_CONTENT_LENGTH=8192)
     servers = {s["id"]: s for s in config["servers"]}
+    locks = {sid: threading.Lock() for sid in servers}
 
     def db():
         conn = sqlite3.connect(database, timeout=10)
@@ -47,11 +53,12 @@ def create_app(config_path=None, db_path=None):
         """)
         for sid in servers:
             conn.execute("INSERT OR IGNORE INTO states VALUES (?, 'unknown')", (sid,))
+        conn.execute("UPDATE events SET detail='Ejecución interrumpida; resultado desconocido. No se reintentó.' WHERE detail='Pendiente de envío.'")
     conn.close()
 
     @app.before_request
     def protect():
-        # The preview has no login; only loopback hosts are allowed.
+        # Access remains restricted to local clients / authenticated SSH tunnels.
         if request.host.split(":")[0] not in {"127.0.0.1", "localhost"}:
             abort(403)
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
@@ -71,6 +78,7 @@ def create_app(config_path=None, db_path=None):
     @app.errorhandler(403)
     @app.errorhandler(404)
     @app.errorhandler(409)
+    @app.errorhandler(502)
     def error(exc):
         return jsonify(error=str(exc.description)), exc.code
 
@@ -94,22 +102,52 @@ def create_app(config_path=None, db_path=None):
         conn.execute("INSERT INTO events(at,server,action,source,detail) VALUES (?,?,?,?,?)",
                      (now.isoformat(), sid, action, source, "Simulación completada; no se contactó al equipo."))
 
+    def queue(conn, sid, selected, source, now):
+        return conn.execute("INSERT INTO events(at,server,action,source,detail) VALUES (?,?,?,?,?)",
+                            (now.isoformat(), sid, selected, source, "Pendiente de envío.")).lastrowid
+
+    def execute(event_id, sid, selected):
+        ok = False
+        if not locks[sid].acquire(blocking=False):
+            detail = "Omitida: ya hay otra acción en curso para este servidor."
+        else:
+            try:
+                detail = controller.execute(sid, selected)
+                ok = True
+            except Exception as exc:
+                detail = f"Error o resultado no confirmado: {exc}"
+            finally:
+                locks[sid].release()
+        conn = db()
+        try:
+            with conn:
+                conn.execute("UPDATE events SET detail=? WHERE id=?", (detail, event_id))
+        finally:
+            conn.close()
+        return ok, detail
+
     @app.get("/")
     def index():
         session.setdefault("csrf", secrets.token_hex(32))
-        return render_template("index.html", csrf=session["csrf"])
+        return render_template("index.html", csrf=session["csrf"], real=bool(controller))
+
+    @app.get("/health")
+    def health():
+        return jsonify(ok=True, mode=mode)
 
     @app.get("/api/state")
     def state():
         conn = db()
         try:
             states = {r["server"]: r["state"] for r in conn.execute("SELECT * FROM states")}
+            if controller:
+                states = {sid: controller.status(sid) for sid in servers}
             schedules = [dict(r) for r in conn.execute("SELECT * FROM schedules ORDER BY time,id")]
             for s in schedules:
                 s["days"] = json.loads(s["days"])
                 s["enabled"] = bool(s["enabled"])
-            return jsonify(mode="simulation", timezone=config["timezone"], now=datetime.now(zone).isoformat(),
-                           servers=[{"id": s["id"], "name": s["name"], "host": s["ssh_host"],
+            return jsonify(mode=mode, timezone=config["timezone"], now=datetime.now(zone).isoformat(),
+                           servers=[{"id": s["id"], "name": s["name"], "host": s["lan_ip"] if controller else s["ssh_host"],
                                      "user": s["ssh_user"], "state": states[s["id"]]} for s in servers.values()],
                            schedules=schedules,
                            events=[dict(r) for r in conn.execute("SELECT * FROM events ORDER BY id DESC LIMIT 100")])
@@ -125,9 +163,17 @@ def create_app(config_path=None, db_path=None):
         conn = db()
         try:
             with conn:
-                simulate(conn, sid, selected, "manual", datetime.now(zone))
+                if controller:
+                    event_id = queue(conn, sid, selected, "manual", datetime.now(zone))
+                else:
+                    simulate(conn, sid, selected, "manual", datetime.now(zone))
         finally:
             conn.close()
+        if controller:
+            ok, detail = execute(event_id, sid, selected)
+            if not ok:
+                abort(502, detail)
+            return jsonify(ok=True, message=detail)
         return jsonify(ok=True)
 
     @app.post("/api/schedules")
@@ -185,6 +231,7 @@ def create_app(config_path=None, db_path=None):
         now = now.astimezone(zone)
         # Local date+minute deliberately excludes UTC offset: a repeated DST hour runs once.
         minute = now.strftime("%Y-%m-%d %H:%M")
+        pending = []
         conn = db()
         try:
             with conn:
@@ -194,11 +241,18 @@ def create_app(config_path=None, db_path=None):
                         continue
                     claimed = conn.execute("INSERT OR IGNORE INTO runs VALUES (?,?)", (rule["id"], minute))
                     if claimed.rowcount:
-                        simulate(conn, rule["server"], rule["action"], "horario", now)
+                        if controller:
+                            event_id = queue(conn, rule["server"], rule["action"], "horario", now)
+                            pending.append((event_id, rule["server"], rule["action"]))
+                        else:
+                            simulate(conn, rule["server"], rule["action"], "horario", now)
         finally:
             conn.close()
+        for event in pending:
+            execute(*event)
 
     app.extensions["picontrol_tick"] = tick
+    app.config["PICONTROL_MODE"] = mode
     return app
 
 
@@ -220,7 +274,7 @@ if __name__ == "__main__":
 
     worker = threading.Thread(target=scheduler, daemon=True)
     worker.start()
-    print(f"PiControl · SIMULACIÓN · http://127.0.0.1:{args.port}", flush=True)
+    print(f"PiControl · {app.config['PICONTROL_MODE'].upper()} · http://127.0.0.1:{args.port}", flush=True)
     try:
         serve(app, host="127.0.0.1", port=args.port, threads=4)
     finally:

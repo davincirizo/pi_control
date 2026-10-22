@@ -4,7 +4,7 @@ Panel local para preparar el control de dos servidores Ubuntu desde una Raspberr
 
 ## Estado de esta versión
 
-**Prototipo funcional en modo simulación.** No contiene un ejecutor SSH ni Wake-on-LAN, no contacta a los equipos y no cambia su estado real. Incluye panel adaptable a móvil, acciones manuales simuladas, horarios semanales persistentes, pausa/eliminación de horarios y los últimos 100 eventos.
+**Simulación por defecto y control real opcional.** Para activar SSH y Wake-on-LAN en Docker bajo /opt/pi_control, sigue [REAL.md](REAL.md). El modo real utiliza una base de datos independiente y requiere configuración y clave SSH locales. En simulación no se contacta a los equipos. Incluye panel adaptable a móvil, acciones manuales simuladas, horarios semanales persistentes, pausa/eliminación de horarios y los últimos 100 eventos.
 
 Configuración: `config.example.json`. Los equipos son `server1@server1` y `david@servidorIA` (IP local conocida: `10.0.0.245`). Controlador previsto: `admin@raspberrypi`. Los tres comparten red Ethernet y tienen Tailscale. Zona horaria: **America/Chicago**, con cambios de horario de verano.
 
@@ -63,12 +63,12 @@ Las pruebas cubren validación, CSRF, restricción del host, confirmación de ap
 
 ## Siguiente etapa: conectar los equipos
 
-1. Probar SSH desde la Raspberry con una clave dedicada para automatización y órdenes limitadas. Las claves personales existentes usan frase de contraseña; no se necesitan para desarrollar el panel.
+1. Completado por el usuario: probar SSH desde la Raspberry con una clave dedicada para automatización y órdenes limitadas. Las claves personales existentes usan frase de contraseña; no se necesitan para desarrollar el panel.
 2. Obtener la MAC e interfaz Ethernet de cada Ubuntu y verificar Wake-on-LAN en sistema, tarjeta y BIOS/UEFI.
 3. Añadir comprobación real de disponibilidad y distinguir «no accesible» de «apagado».
 4. Añadir autenticación, permisos y pruebas del ejecutor antes de habilitar acciones reales.
 5. Preparar servicio systemd y acceso privado por Tailscale.
 
-Nada se ha instalado en la Raspberry ni en los servidores durante el desarrollo de esta versión.
+El usuario ya instaló Docker y el panel en simulación en la Raspberry, y verificó SSH y los permisos sudo en los servidores. La actualización real requiere ejecutar los pasos de REAL.md. No se han probado apagados o reinicios reales desde el panel.
 
 Referencias: [Flask](https://flask.palletsprojects.com/en/stable/), [zoneinfo de Python](https://docs.python.org/3/library/zoneinfo.html).

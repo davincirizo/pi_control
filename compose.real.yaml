@@ -1,0 +1,8 @@
+services:
+  picontrol:
+    volumes:
+      - ./config.real.json:/app/config.example.json:ro
+      - ./data-real:/app/data
+      - ./runtime-ssh:/run/picontrol-ssh:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]

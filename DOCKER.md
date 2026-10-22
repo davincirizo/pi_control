@@ -1,6 +1,6 @@
 # PiControl en Docker — Raspberry Pi ARM64
 
-Docker Compose es la instalación elegida para este proyecto. Esta entrega ejecuta únicamente el panel de simulación; todavía no incluye acciones SSH ni Wake-on-LAN.
+Docker Compose es la instalación elegida para este proyecto. La configuración predeterminada ejecuta simulación. Para habilitar el control real desde /opt/pi_control, sigue REAL.md; incluye un archivo Compose adicional y comprobación SSH previa.
 
 ## Instalar desde GitHub en la Raspberry
 

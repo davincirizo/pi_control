@@ -2,6 +2,8 @@
 !Dockerfile
 !requirements.txt
 !app.py
+!control.py
+!test_control.py
 !test_app.py
 !config.example.json
 !templates/
