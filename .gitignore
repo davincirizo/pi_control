@@ -17,3 +17,6 @@ ssh/
 runtime-ssh/
 config.real.json
 data-real/
+
+config.real.json.bak-*
+.picontrol-add.*

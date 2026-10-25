@@ -1,0 +1,12 @@
+{
+  "id": "nas-server",
+  "name": "nas-server",
+  "ssh_host": "10.0.0.224",
+  "ssh_user": "david",
+  "ssh_port": 22,
+  "lan_ip": "10.0.0.224",
+  "mac_address": "00:e0:4c:79:95:e5",
+  "broadcast_address": "10.0.0.255",
+  "ethernet_interface": "enp2s0",
+  "actions_enabled": true
+}

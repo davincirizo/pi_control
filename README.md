@@ -72,3 +72,5 @@ Las pruebas cubren validación, CSRF, restricción del host, confirmación de ap
 El usuario ya instaló Docker y el panel en simulación en la Raspberry, y verificó SSH y los permisos sudo en los servidores. La actualización real requiere ejecutar los pasos de REAL.md. No se han probado apagados o reinicios reales desde el panel.
 
 Referencias: [Flask](https://flask.palletsprojects.com/en/stable/), [zoneinfo de Python](https://docs.python.org/3/library/zoneinfo.html).
+
+Para añadir nas-server desde GitHub sin sustituir la configuración local, sigue [NAS.md](NAS.md).

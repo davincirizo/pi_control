@@ -15,7 +15,8 @@ if [ -f .env ] && grep -q '^COMPOSE_FILE=' .env && ! grep -qxF 'COMPOSE_FILE=com
 fi
 known_tmp=$(mktemp)
 trap 'rm -f -- "$known_tmp"' EXIT
-for host in 10.0.0.127 10.0.0.245; do
+hosts=$(python3 -c 'import json; from pathlib import Path; p=Path("config.real.json"); p=p if p.exists() else Path("config.example.json"); print(" ".join(s["lan_ip"] for s in json.loads(p.read_text(encoding="utf-8-sig"))["servers"]))')
+for host in $hosts; do
   ssh-keygen -F "$host" -f "$HOME/.ssh/known_hosts" >> "$known_tmp" || {
     echo "Falta la identidad ya verificada de $host en known_hosts"; exit 1;
   }
